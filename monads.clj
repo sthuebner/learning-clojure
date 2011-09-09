@@ -266,3 +266,17 @@
 
 ;;;; following http://onclojure.com/2009/03/23/a-monad-tutorial-for-clojure-programmers-part-3/
 
+
+;;; :when clause in 'for
+(for [a (range 5)
+      :when (odd? a)]
+  (* 2 a))
+;; (2 6)
+
+
+;;; monadic
+(domonad sequence-m
+         [a (range 5)
+          :when (odd? a)]
+         (* 2 a))
+;; (2 6)
