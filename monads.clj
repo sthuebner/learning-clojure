@@ -1,5 +1,6 @@
 (ns monads
   (:use clojure.contrib.monads
+        clojure.test
         [clojure.repl :only [source]]))
 
 ;;;; following http://onclojure.com/2009/03/05/a-monad-tutorial-for-clojure-programmers-part-1/
@@ -153,4 +154,115 @@
                           b (range a)]
                          (* a b)))
 ;; (clojure.contrib.monads/with-monad sequence-m (m-bind (range 5) (fn [a] (m-bind (range a) (fn [b] (m-result (* a b)))))))
+
+
+
+;;;; TODO study the Three Laws of Monads
+
+
+
+;;;; Operations used with Monads
+
+;;; m-lift
+(def nil-respecting-addition
+  (with-monad maybe-m
+    (m-lift 2 +)))
+
+(is (= (nil-respecting-addition 2 3)
+       5))
+;; 5
+
+(is (= (nil-respecting-addition 2 nil)
+       nil))
+;; nil
+
+(is (thrown? NullPointerException (+ 2 nil)))
+;; throws NPE
+
+;;; what's happening here?
+;(macroexpand-1 '(m-lift 2 +))
+;; (clojure.core/fn [mv_4649 mv_4650] (m-bind mv_4649 (fn [x_4651] (m-bind mv_4650 (fn [x_4652] (m-result (+ x_4651 x_4652)))))))
+
+;; m-lift creates a function of N monadic expressions that returns a monadic expression
+
+
+;; no the same with domonad
+(defn nil-respecting-addition
+  [x y]
+  (domonad maybe-m
+          [a x
+           b y]
+          (+ a b)))
+
+(is (= (nil-respecting-addition 2 3)
+       5))
+;; true
+
+(is (= (nil-respecting-addition 2 nil)
+       nil))
+;; true
+
+
+;;; "Exercice: The following function is equivalent to a well-known built-in Clojure function. Which one?"
+(with-monad sequence-m
+  (defn mystery
+    [f xs]
+    ( (m-lift 1 f) xs )))
+
+;; Answer: it's the map function
+(is (= (mystery inc [1 2 3])
+       [2 3 4]))
+;; true
+
+
+
+;;;; m-seq operation
+(with-monad sequence-m
+  (defn ntuples [n xs]
+    (m-seq (replicate n xs))))
+
+(is (= (ntuples 2 [1 2 3])
+       '((1 1) (1 2) (1 3) (2 1) (2 2) (2 3) (3 1) (3 2) (3 3))))
+;; true
+
+;; trying to translate m-seq
+(defn m-seq* [ms]
+  (reduce (fn [q p]
+            (m-bind-sequence p (fn [x]
+                                 (m-bind-sequence q (fn [y]
+                                                      (m-result-sequence (cons x y)))) )))
+          (m-result-sequence '())
+          (reverse ms)))
+
+(defn ntuples [n xs]
+  (m-seq* (replicate n xs)))
+
+(is (= (ntuples 2 [1 2 3])
+       '((1 1) (1 2) (1 3) (2 1) (2 2) (2 3) (3 1) (3 2) (3 3))))
+;; true
+
+
+
+;;;; m-chain operation
+;;; example: find the n-th generation ascendants of a class
+(with-monad sequence-m
+  (defn n-th-generation
+    [n cls]
+    ( (m-chain (replicate n parents)) cls )))
+
+(n-th-generation 0 (class []))
+;; (clojure.lang.PersistentVector)
+
+(n-th-generation 1 (class []))
+;; (clojure.lang.APersistentVector clojure.lang.IObj clojure.lang.IEditableCollection)
+
+(n-th-generation 2 (class []))
+;; (java.lang.Iterable clojure.lang.AFn java.lang.Comparable java.io.Serializable java.util.RandomAccess clojure.lang.IPersistentVector java.util.List clojure.lang.IMeta)
+
+
+
+
+
+
+;;;; following http://onclojure.com/2009/03/23/a-monad-tutorial-for-clojure-programmers-part-3/
 
